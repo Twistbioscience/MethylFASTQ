@@ -190,7 +190,7 @@ class ChromosomeSequencer(object):
         self.__fragments = sorted(fragments, key=lambda x: x[2]-x[1], reverse=True)
 
         for seq, begin, end in self.__fragments:
-            print(begin, end, end-begin)
+            print(begin, end, end-begin, seq)
 
 
     def consumer(self, num_jobs, params, queue):
