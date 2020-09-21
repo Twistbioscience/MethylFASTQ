@@ -154,7 +154,7 @@ class ChromosomeSequencer(object):
             for seq, begin, end in self.__fragments:
                 print(f'Original start: {begin} end: {end}')
                 if not len(seq) > self.__fragment_size:
-                    delta = self.__fragment_size - len(seq) - 1
+                    delta = self.__fragment_size - len(seq) - 2
                     if not (delta % 2) == 0:
                         delta = delta + 1
                     begin = int(begin - (delta/2))
