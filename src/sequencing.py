@@ -152,7 +152,7 @@ class ChromosomeSequencer(object):
             expanded_targeted_regions = []
             for seq, begin, end in self.__fragments:
                 if not len(seq) > self.__fragment_size:
-                    delta = len(seq) - self.__fragment_size + 1
+                    delta = len(seq) - self.__fragment_size - 1
                     if not (delta % 2) == 0:
                         delta = delta + 1
                     begin = begin - (delta/2)
