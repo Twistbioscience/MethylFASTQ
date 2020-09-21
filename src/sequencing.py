@@ -115,24 +115,25 @@ class ChromosomeSequencer(object):
     se la library è direzionale o non direzionale, la lunghezza dei frammenti
     e delle read """
 
-    def __init__(self, chromosome, target_regions=list()):
+    def __init__(self, chromosome, fragment_size, target_regions=list()):
         """Parserizza il cromosoma individuando gli intervalli da sequenziare e scartando
         i nucleotidi indefiniti (basi N)"""
 
         chromosome_sequence = str(chromosome.seq).lower()
 
         self.__chromoId = chromosome.id
+        self.__fragment_size = fragment_size
         self.__fragments = [(chromosome_sequence[begin:end], begin, end) for (begin, end) in target_regions]
         self.__stats = Stats()
 
+        print("Parsing {} sequence... ".format(chromosome.id), end="", flush=True)
+        chr_size = len(chromosome.seq)
+
+        # get salient fragments
+        start, i = timer(), 0
+
         if len(target_regions) == 0:
-            #WGBS option
-            print("Parsing {} sequence... ".format(chromosome.id), end="", flush=True)
-            chr_size = len(chromosome.seq)
-
-            #get salient fragments
-            start, i = timer(), 0
-
+            # WGBS option
             while i < chr_size:
                 while i < chr_size and chromosome_sequence[i] == 'n':
                     i += 1
@@ -146,13 +147,30 @@ class ChromosomeSequencer(object):
                 last = self.__fragments.pop()
                 if last[1] < last[2]:
                     self.__fragments.append(last)
+        else:
+            # Targeted option
+            expanded_targeted_regions = []
+            for seq, begin, end in self.__fragments:
+                if not len(seq) > self.__fragment_size:
+                    delta = len(seq) - self.__fragment_size + 1
+                    if not (delta % 2) == 0:
+                        delta = delta + 1
+                    begin = begin - (delta/2)
+                    if begin < 0:
+                        begin = 0
+                    end = end + (delta/2)
+                    if end > chr_size:
+                        end = chr_size
+                    seq = chromosome_sequence[begin:end]
+                t = (seq, begin, end)
+                expanded_targeted_regions.append(t)
+            self.__fragments = expanded_targeted_regions
 
-            tot_time = format_time(timer() - start)
+        tot_time = format_time(timer() - start)
 
-            #sommo dimensioni intervalli
-            self.__stats.increment_bps(sum([e-b for _, b, e in self.__fragments]))
-            print("{} fragments found: {} bp. Elapsed time {}".format(len(self.__fragments), self.__stats.nbases, tot_time), flush=True)
-
+        #sommo dimensioni intervalli
+        self.__stats.increment_bps(sum([e-b for _, b, e in self.__fragments]))
+        print("{} fragments found: {} bp. Elapsed time {}".format(len(self.__fragments), self.__stats.nbases, tot_time), flush=True)
 
     def load_balancing(self, num_workers):
         totsize = sum([e-b for _, b, e in self.__fragments])

@@ -73,7 +73,7 @@ class MethylFASTQ(object):
             if self.params.chr is None or fasta_record.id in self.params.chr:
                 print("Sequencing {}: {} bp".format(fasta_record.id, len(fasta_record)), flush=True)
 
-                stats = seq.ChromosomeSequencer(fasta_record).sequencing(self.params)
+                stats = seq.ChromosomeSequencer(fasta_record, self.params.fragment_size).sequencing(self.params)
                 self.__stats.update(stats)
 
 
@@ -84,7 +84,8 @@ class MethylFASTQ(object):
                 curr_chr = self.regions[fasta_record.id]
                 print("{} --> {}".format(fasta_record.id, curr_chr))
 
-                stats = seq.ChromosomeSequencer(fasta_record, target_regions=curr_chr).sequencing(self.params)
+                stats = seq.ChromosomeSequencer(fasta_record, self.params.fragment_size, target_regions=curr_chr)\
+                           .sequencing(self.params)
                 self.__stats.update(stats)
 
     def __load_regions(self, filename):
