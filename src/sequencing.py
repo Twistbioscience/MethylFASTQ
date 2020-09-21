@@ -161,6 +161,7 @@ class ChromosomeSequencer(object):
                     end = end + (delta/2)
                     if end > chr_size:
                         end = chr_size
+                    print(f'Expanded start: {begin} end: {end}')
                     seq = chromosome_sequence[begin:end]
                 t = (seq, begin, end)
                 expanded_targeted_regions.append(t)
