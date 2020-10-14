@@ -24,6 +24,7 @@ from io import StringIO
 import random
 import enum
 from math import exp
+import shortuuid
 
 class strand(enum.Enum):
     Unspecified = 0
@@ -72,8 +73,17 @@ class dna(object):
 #        return str(self)[:read_length]
 
     def paired_end_sequencing(self, read_length):
-        r1 = dna(self[:read_length])
-        r2 = dna(self[-read_length:]).reverse_complement()
+        if len(self) > read_length:
+            r1 = dna(str(self.sequence)[:read_length])
+            r2 = dna(str(self.sequence)[-read_length:]).reverse_complement()
+        else:
+            new_fow = str(self.sequence) + "AGATCGGAAGAGCACACGTCTGAACTCCAGTCAAGATCGGAAGAGCACACGTCTGAACTCCAGTCAAGATCGGAAGAGCACACGTCTGAACTCCAGTCAAGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+            r1 = dna(new_fow[:read_length])
+            new_rev = str(dna(str(self.sequence)).reverse_complement()) + "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+            r2 = new_rev[:read_length]
+            #self.sequence = str(r1)
+        raise Exception(r1, r2)
+        assert len(str(r1)) == len(str(r2)) == read_length
         return paired_end_read(str(r1), str(r2))
 #        return str(r1), str(r2)
 
@@ -190,7 +200,7 @@ class read(object):
                 self.quality[index] -= int(random.random() * 1000) % 10
         return self
 
-    def fastqize(self, read_id, fsize, offset, paired_end=None):
+    def fastqize(self, read_id, fsize, offset, uid, paired_end=None):
         begin = self.begin + offset + 1 #
 
         #indici di mapping delle read
@@ -213,13 +223,19 @@ class read(object):
         if self.strand in (strand.ReverseStrand, strand.BisulfiteReverseStrand, strand.BisulfiteForwardReverseComplement):
             begin += (fsize - len(self))
 
-        read_id = "{}:{}:{}{}".format(read_id, begin, flags, paired_end)
+        read_id = "{}:{}:{}:{}:{}{}".format(read_id, begin, begin+fsize, uid, flags, paired_end)
         default_quality = "~" * len(self)#self.__seqparams.read_length
 
         fastq_read = "@{}\n{}\n+\n{}\n".format(read_id, str(self.__sequence).upper(), default_quality)
         record = SeqIO.read(StringIO(fastq_read), "fastq")
         #set read quality
-        record.letter_annotations["phred_quality"] = self.quality
+        try:
+            record.letter_annotations["phred_quality"] = self.quality[:len(self.__sequence)]
+        except:
+            print(self.sequence)
+            print(self.__sequence)
+            raise Exception("blah")
+            #raise Exception(f'{len(str(self.__sequence))} : {len(self.quality)}')
         return record #Bio.SeqRecord.SeqRecord
 
     @property
@@ -249,7 +265,11 @@ class paired_end_read(object):
 
     def fastqize(self, read_id, fsize, offset):
         #il nome delle read paired-end finisce con /1 o /2 -- modificare record fastq??
-        r1 = self.__r1.fastqize(read_id, fsize, offset, "/1")
-        r2 = self.__r2.fastqize(read_id, fsize, offset, "/2")
+        try:
+            uid = shortuuid.ShortUUID().random(length=8)
+            r1 = self.__r1.fastqize(read_id, fsize, offset, uid, "/1")
+            r2 = self.__r2.fastqize(read_id, fsize, offset, uid, "/2")
+        except:
+            raise Exception(len(self.__r1), len(self.__r2))
 
         return r1, r2

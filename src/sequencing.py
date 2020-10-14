@@ -29,6 +29,7 @@ from timeit import default_timer as timer
 import enum
 import sys
 import math
+from scipy.stats import norm, truncnorm
 
 import dna
 
@@ -115,14 +116,16 @@ class ChromosomeSequencer(object):
     se la library è direzionale o non direzionale, la lunghezza dei frammenti
     e delle read """
 
-    def __init__(self, chromosome, fragment_size, target_regions=list()):
+    def __init__(self, chromosome, params, target_regions=list()):
         """Parserizza il cromosoma individuando gli intervalli da sequenziare e scartando
         i nucleotidi indefiniti (basi N)"""
 
         chromosome_sequence = str(chromosome.seq).lower()
 
         self.__chromoId = chromosome.id
-        self.__fragment_size = fragment_size
+        self.__fragment_size_mean = params.fragment_size_mean
+        self.__fragment_size_sd = params.fragment_size_sd
+        self.__targeted_mode = True if len(target_regions) > 0 else False
         self.__fragments = [(chromosome_sequence[begin:end], begin, end) for (begin, end) in target_regions]
         self.__stats = Stats()
 
@@ -147,27 +150,27 @@ class ChromosomeSequencer(object):
                 last = self.__fragments.pop()
                 if last[1] < last[2]:
                     self.__fragments.append(last)
-        else:
-            # Targeted option
-            expanded_targeted_regions = []
-            print(' ')
-            for seq, begin, end in self.__fragments:
-                print(f'Original start: {begin} end: {end}')
-                if not len(seq) > self.__fragment_size:
-                    delta = self.__fragment_size - len(seq) + 2
-                    if not (delta % 2) == 0:
-                        delta = delta + 1
-                    begin = int(begin - (delta/2))
-                    if begin < 0:
-                        begin = 0
-                    end = int(end + (delta/2))
-                    if end > chr_size:
-                        end = chr_size
-                    print(f'Expanded start: {begin} end: {end}')
-                    seq = chromosome_sequence[begin:end]
-                t = (seq, begin, end)
-                expanded_targeted_regions.append(t)
-            self.__fragments = expanded_targeted_regions
+        # else:
+        #     # Targeted option
+        #     expanded_targeted_regions = []
+        #     print(' ')
+        #     for seq, begin, end in self.__fragments:
+        #         print(f'Original start: {begin} end: {end}')
+        #         if not len(seq) > self.__fragment_size:
+        #             delta = self.__fragment_size - len(seq) + 2
+        #             if not (delta % 2) == 0:
+        #                 delta = delta + 1
+        #             begin = int(begin - (delta/2))
+        #             if begin < 0:
+        #                 begin = 0
+        #             end = int(end + (delta/2))
+        #             if end > chr_size:
+        #                 end = chr_size
+        #             print(f'Expanded start: {begin} end: {end}')
+        #             seq = chromosome_sequence[begin:end]
+        #         t = (seq, begin, end)
+        #         expanded_targeted_regions.append(t)
+        #     self.__fragments = expanded_targeted_regions
 
         tot_time = format_time(timer() - start)
 
@@ -197,7 +200,7 @@ class ChromosomeSequencer(object):
                     subseq = (sequence[prev:curr], begin+prev, begin+curr)
                     fragments.append(subseq)
 
-                    print("[{} - {}] ".format(subseq[1], subseq[2]), end="")
+                    #print("[{} - {}] ".format(subseq[1], subseq[2]), end="")
 
 #                    print("\tsubjob {} from {} to {}".format(n+1, begin+prev, begin+curr))
                     prev, curr = curr, curr + average
@@ -210,8 +213,8 @@ class ChromosomeSequencer(object):
 
         self.__fragments = sorted(fragments, key=lambda x: x[2]-x[1], reverse=True)
 
-        for seq, begin, end in self.__fragments:
-            print(begin, end, end-begin, seq)
+        #for seq, begin, end in self.__fragments:
+        #    print(begin, end, end-begin, seq)
 
 
     def consumer(self, num_jobs, params, queue):
@@ -286,7 +289,8 @@ class ChromosomeSequencer(object):
                 "offset": (begin, end),
                 "params": params,
                 "queue": queue,
-                "process_id": index
+                "process_id": index,
+                "targeted_mode": self.__targeted_mode
             }
             for index, (seq, begin, end) in enumerate(self.__fragments)
         ]
@@ -297,8 +301,8 @@ class ChromosomeSequencer(object):
         if single_end:
             fastq_file = open("{}.fastq".format(output_filename), "a")
         else:
-            fastq_file1 = open("{}_R1.fastq".format(output_filename), "a")
-            fastq_file2 = open("{}_R2.fastq".format(output_filename), "a")
+            fastq_file1 = open("{}_S1_L001_R1_001.fastq".format(output_filename), "a")
+            fastq_file2 = open("{}_S1_L001_R2_001.fastq".format(output_filename), "a")
 
         meth_file = open("{}.ch3".format(output_filename), "a")
         csv_meth = csv.writer(meth_file, delimiter="\t")
@@ -362,7 +366,7 @@ class ChromosomeSequencer(object):
                 fastq_file1.close()
                 fastq_file2.close()
 
-        return self.__stats
+        return self.__stats, "{}_S1_L001_R1_001.fastq".format(output_filename), "{}_S1_L001_R2_001.fastq".format(output_filename)
 
     def __sequencing(self, params):
         self.load_balancing(params.num_processes)
@@ -394,10 +398,20 @@ class ChromosomeSequencer(object):
 
 
     def __get_output_filename(self, params):
-        fasta = "".join(params.fasta_file.split("/")[-1].split(".")[:-1])
-        se_pe = "se" if params.seq_mode == "single_end" else "pe"
-        dir_nondir = "dir" if params.lib_mode == "directional" else "undir"
-        return "{}/{}_{}_f{}r{}_{}".format(params.output_path, fasta, se_pe, params.fragment_size, params.read_length, dir_nondir)
+        panelname = os.path.basename(params.regions).rstrip('.bed')
+        frag_mean = f'fm{params.fragment_size_mean}'
+        frag_sd = f'fsd{params.fragment_size_sd}'
+        coverage = f'{params.coverage}X'
+        read_len = f'rl{params.read_length}'
+        cg = f'cg{params.p_cg}'
+        chg = f'chg{params.p_chg}'
+        chh = f'chh{params.p_chh}'
+        snp = f'snp{params.snp_rate}'
+        error = f'err{params.error_rate}'
+
+        filename = f'{panelname}_{frag_mean}_{frag_sd}_{coverage}_{read_len}_{cg}_{chg}_{chh}_{snp}_{error}'
+
+        return "{}/{}".format(params.output_path.strip('/'), filename.strip('/'))
 
 
     def create_reads(self, input_process):#, seq_mode, queue):
@@ -406,14 +420,14 @@ class ChromosomeSequencer(object):
         queue = input_process["queue"]
         params = input_process["params"]
         process_id = input_process["process_id"] #new
+        targeted_mode = input_process["targeted_mode"]
 
         pid = os.getpid()
 
         print("<Process {}>: starting sequencing [{} - {}]: {} bp".format(pid, offset_begin, offset_end, offset_end-offset_begin), flush=True)
         start = timer()
 
-        fs = FragmentSequencer(self.__chromoId, sequence, offset_begin, offset_end, \
-                                params, queue=queue)
+        fs = FragmentSequencer(self.__chromoId, sequence, offset_begin, offset_end, params, targeted_mode=targeted_mode, queue=queue)
         fs.single_end_sequencing() if params.seq_mode == "single_end" else fs.paired_end_sequencing()
 
         elapsed = format_time(timer() - start)
@@ -427,13 +441,16 @@ class ChromosomeSequencer(object):
 class FragmentSequencer(object):
     """..."""
 
-    def __init__(self, chr_id, sequence, begin_seq, end_seq, seqparams, queue):
+    def __init__(self, chr_id, sequence, begin_seq, end_seq, seqparams, targeted_mode, queue):
         #informazioni sulla sequenza
         self.__chromoId = chr_id
         self.__sequence = sequence
 #        self.__genome_size = gsize
+        self.targeted_mode = targeted_mode
         #posizione del frammento nel genoma
         self.__offset_forward = begin_seq
+        self.__begin = begin_seq
+        self.__end = end_seq
 #        self.__offset_reverse = gsize - end_seq
         #dimensione buffer + parametri vari
         self.__buffer_size = seqparams.buffer_size
@@ -458,17 +475,37 @@ class FragmentSequencer(object):
 
     def fragmentation(self):
         """ """
-        max_step = 2*int(round(self.__seqparams.fragment_size / self.__seqparams.coverage))
-        i = 0
+        if not self.targeted_mode:
+            max_step = 2*int(round(self.__seqparams.fragment_size_mean / self.__seqparams.coverage))
+            i = 0
 
-        while (i + self.__seqparams.fragment_size) < len(self.__sequence):
-            fragment = self.__sequence[i: i + self.__seqparams.fragment_size]
+            while (i + self.__seqparams.fragment_size_mean) < len(self.__sequence):
+                fragment = self.__sequence[i: i + self.__seqparams.fragment_size_mean]
 
-            if len(fragment) == self.__seqparams.fragment_size:
-                yield dna.fragment(fragment, i, i + self.__seqparams.fragment_size)\
-                        .methylate(self.methylate_cytosine)
+                if len(fragment) == self.__seqparams.fragment_size_mean:
+                    yield dna.fragment(fragment, i, i + self.__seqparams.fragment_size_mean)\
+                            .methylate(self.methylate_cytosine)
 
-            i += random.randint(1, max_step) #in media ogni base è coperta da C reads
+                i += random.randint(1, max_step) #in media ogni base è coperta da C reads
+        else:
+            yield dna.fragment(self.__sequence, self.__begin, self.__end).methylate(self.methylate_cytosine)
+            #for _ in range(0, self.__seqparams.coverage):
+                # isize = 0
+                # while isize <= 1:
+                #     isize = norm.rvs(loc=self.__seqparams.fragment_size_mean, scale=self.__seqparams.fragment_size_sd, size=1)[0]
+                # if isize <= 120:
+                #     delta = 120 - isize
+                #     left_remove = int(round(delta/2))
+                #     new_begin = self.__begin + left_remove
+                # else:
+                #     delta = isize - 120
+                #     left_add = int(round(delta/2))
+                #     new_begin = self.__begin - left_add
+                # new_end = new_begin + isize
+                # fragment = self.__sequence[new_begin:new_end]
+                # print(self.__chromoId, new_begin, new_end, isize)
+              #  fragment = self.__sequence[self.__begin:self.__end]
+              #  yield dna.fragment(fragment, self.__begin, self.__end).methylate(self.methylate_cytosine)
 
 
     def single_end_sequencing(self):
@@ -529,7 +566,7 @@ class FragmentSequencer(object):
     def paired_end_sequencing(self):
         """Produce le read paired-end del frammento e le salva su un file temporaneo"""
 
-        fragment_size = self.__seqparams.fragment_size
+        fragment_size = self.__end - self.__begin
         read_length = self.__seqparams.read_length
         directional = self.__seqparams.lib_mode == "directional"
         seq_length = len(self.__sequence)
