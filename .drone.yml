@@ -1,0 +1,26 @@
+pipeline:
+#  build&test-python:
+#    image: images.sbgenomics.com/twist-r-d/r-d-toolshed/bfx-ngs-te-designer:master.latest
+#    #image: python:3.7
+#    pull: true
+#    secrets: [ docker_username, docker_password ]
+#    commands:
+#      # Copy over the pypirc so we are nexus-aware
+#      - cp pypirc ~/.pypirc
+#      # Install test requirements
+#      - pip install pytest
+#      # Run python tests
+#      - pip install -e ./
+#      - python setup.py test
+  publish-python:
+    image: docker.twistbioscience-staging.com/devops_slave_python:3.7
+    commands:
+      # Copy over the pypirc so we are nexus-aware
+      - cp /etc/.pypirc ~/.pypirc
+      # Upload source tarball to Nexus
+      - python setup.py sdist upload -r nexus
+      # Build binary wheel - source tarball is not useful for most
+      - python setup.py bdist_wheel upload -r nexus
+    when:
+      branch: [ master ]
+      event: [ push ]
