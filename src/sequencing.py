@@ -411,7 +411,7 @@ class ChromosomeSequencer(object):
 
         filename = f'{panelname}_{frag_mean}_{frag_sd}_{coverage}_{read_len}_{cg}_{chg}_{chh}_{snp}_{error}'
 
-        return "{}/{}".format(params.output_path.strip('/'), filename.strip('/'))
+        return "{}/{}".format(params.output_path.rstrip('/'), filename.strip('/'))
 
 
     def create_reads(self, input_process):#, seq_mode, queue):
