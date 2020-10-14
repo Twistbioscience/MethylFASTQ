@@ -31,7 +31,7 @@ import sys
 import math
 from scipy.stats import norm, truncnorm
 
-import dna
+import bfx_ngs_te_simulate_methyl.dna as dna
 
 
 def format_time(time):

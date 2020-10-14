@@ -24,12 +24,12 @@ import os, pathlib
 import random, string
 import csv
 from Bio import SeqIO
-import sequencing as seq
+import bfx_ngs_te_simulate_methyl.sequencing as seq
 from pybedtools import BedTool
 import multiprocessing as mp
 from scipy.stats import norm, truncnorm
 import subprocess
-import repair
+import bfx_ngs_te_simulate_methyl.repair as repair
 
 from timeit import default_timer as timer
 
