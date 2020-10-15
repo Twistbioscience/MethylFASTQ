@@ -758,7 +758,14 @@ class TargetedFragmentSequencer(object):
 
         cinfo = self.__format_methylation()
 
-        return reads, cinfo
+        # reads is list of tuples (r1, r2) in SeqIO format
+        reads_plain = list()
+        for read_pair in reads:
+            r1 = read_pair[0].format("fastq")
+            r2 = read_pair[1].format("fastq")
+            reads.append(tuple((r1, r2)))
+
+        return reads_plain, cinfo
 
     ###################### Methylation ######################
 
