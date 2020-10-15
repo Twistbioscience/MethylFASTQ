@@ -676,12 +676,16 @@ class FragmentSequencer(object):
                     for position, cytosine in self.__cytosines.items()]
 
 
+class objectview(object):
+    def __init__(self, d):
+        self.__dict__ = d
+
+
 class TargetedFragmentSequencer(object):
     """..."""
 
     def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=10, maxq=40):
-        for k, v in params.items():
-            params.k = v
+        params = objectview(params)
         #informazioni sulla sequenza
         self.__chromoId = chrom
         self.__sequence = sequence
@@ -693,9 +697,9 @@ class TargetedFragmentSequencer(object):
         #dimensione buffer + parametri vari
         self.__seqparams = params
         self.__p_meth =  {
-            CytosineContext.CG: params['cg'],
-            CytosineContext.CHG: params['chg'],
-            CytosineContext.CHH: params['chh']
+            CytosineContext.CG: params.cg,
+            CytosineContext.CHG: params.chg,
+            CytosineContext.CHH: params.chh
         }
         #dati sulle citosine
         self.__cytosines = dict()
@@ -809,6 +813,5 @@ class TargetedFragmentSequencer(object):
         """ Returns a list containing all the information about cytosines """
         beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
 
-        return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,\
-                cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) \
-                    for position, cytosine in self.__cytosines.items()]
+        return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,
+                 cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) for position, cytosine in self.__cytosines.items()]
