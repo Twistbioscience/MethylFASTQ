@@ -813,5 +813,5 @@ class TargetedFragmentSequencer(object):
         """ Returns a list containing all the information about cytosines """
         beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
 
-        return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,
+        return [(self.__chromoId, abs(position), cytosine.strand, cytosine.context,
                  cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) for position, cytosine in self.__cytosines.items()]
