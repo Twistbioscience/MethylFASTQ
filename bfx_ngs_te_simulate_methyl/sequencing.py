@@ -707,7 +707,7 @@ class TargetedFragmentSequencer(object):
         self.__read_quality = dna.read_quality(params.read_length, minq, maxq)
         ##############################
         self.__set_snp()
-        self.__initialize_cytosines()
+        self.__initialize_cytosines(frag_start)
 
 
     ###################### Sequencing ######################
@@ -761,7 +761,7 @@ class TargetedFragmentSequencer(object):
 
     ###################### Methylation ######################
 
-    def __initialize_cytosines(self):
+    def __initialize_cytosines(self, begin):
         """Parserizza il genoma e indicizza le citosine sui due strand"""
 
         limit = len(self.__sequence)
@@ -775,7 +775,7 @@ class TargetedFragmentSequencer(object):
                 elif pos+2 < limit and self.__sequence[pos+2] == 'g':
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos] = Cytosine("+", context)
+                self.__cytosines[pos+begin] = Cytosine("+", context)
             #strand -
             elif base == 'g':
                 context = CytosineContext.CHH
@@ -784,7 +784,7 @@ class TargetedFragmentSequencer(object):
                 elif pos-2 >= 0 and self.__sequence[pos-2] == "c":
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos] = Cytosine("-", context)
+                self.__cytosines[pos+begin] = Cytosine("-", context)
 
 
     def methylate_cytosine(self, base, position):
