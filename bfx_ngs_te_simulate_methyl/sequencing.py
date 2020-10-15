@@ -731,12 +731,12 @@ class TargetedFragmentSequencer(object):
             bsfs = fragment.forward_strand.bisulfite()
             fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality)\
                         .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                        .fastqize(self.__chromoId, fragment_size, 0)
 
             bsrs = fragment.reverse_strand.bisulfite()
             fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality)\
                         .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                        .fastqize(self.__chromoId, fragment_size, 0)
 
             reads.extend([fastq_fw, fastq_rv])
 
@@ -746,12 +746,12 @@ class TargetedFragmentSequencer(object):
                 fastq_fwrc = bsfs.reverse_complement()\
                             .paired_end_sequencing(read_length, self.__read_quality)\
                             .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                            .fastqize(self.__chromoId, fragment_size, 0)
 
                 fastq_rvrc = bsrs.reverse_complement()\
                             .paired_end_sequencing(read_length, self.__read_quality)\
                             .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                            .fastqize(self.__chromoId, fragment_size, 0)
 
                 reads.extend([fastq_fwrc, fastq_rvrc])
 
