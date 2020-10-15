@@ -30,6 +30,7 @@ import enum
 import sys
 import math
 from scipy.stats import norm, truncnorm
+import pandas as pd
 
 import bfx_ngs_te_simulate_methyl.dna as dna
 
@@ -813,5 +814,9 @@ class TargetedFragmentSequencer(object):
         """ Returns a list containing all the information about cytosines """
         beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
 
-        return [(self.__chromoId, abs(position), cytosine.strand, cytosine.context,
+        data = [(self.__chromoId, abs(position+1), cytosine.strand, str(cytosine.context),
                  cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) for position, cytosine in self.__cytosines.items()]
+
+        df = pd.DataFrame(data, columns=['chrom', 'pos', 'strand', 'context', 'nmeth', 'ncov', 'beta_score'])
+
+        return df
