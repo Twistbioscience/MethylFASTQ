@@ -763,7 +763,7 @@ class TargetedFragmentSequencer(object):
         for read_pair in reads:
             r1 = read_pair[0].format("fastq")
             r2 = read_pair[1].format("fastq")
-            reads.append(tuple((r1, r2)))
+            reads_plain.append(tuple((r1, r2)))
 
         return reads_plain, cinfo
 
