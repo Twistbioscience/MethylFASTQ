@@ -679,8 +679,8 @@ class FragmentSequencer(object):
 class TargetedFragmentSequencer(object):
     """..."""
 
-    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params):
-        for k, v in params:
+    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=10, maxq=40):
+        for k, v in params.items():
             params.k = v
         #informazioni sulla sequenza
         self.__chromoId = chrom
@@ -700,11 +700,10 @@ class TargetedFragmentSequencer(object):
         #dati sulle citosine
         self.__cytosines = dict()
 
-        self.__read_quality = dna.read_quality(params.read_length, 10, 40)
+        self.__read_quality = dna.read_quality(params.read_length, minq, maxq)
         ##############################
         self.__set_snp()
         self.__initialize_cytosines()
-
 
 
     ###################### Sequencing ######################
