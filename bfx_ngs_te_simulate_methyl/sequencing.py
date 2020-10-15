@@ -674,3 +674,142 @@ class FragmentSequencer(object):
         return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,\
                 cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) \
                     for position, cytosine in self.__cytosines.items()]
+
+
+class TargetedFragmentSequencer(object):
+    """..."""
+
+    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params):
+        for k, v in params:
+            params.k = v
+        #informazioni sulla sequenza
+        self.__chromoId = chrom
+        self.__sequence = sequence
+        #posizione del frammento nel genoma
+        self.__offset_forward = frag_start
+        self.__begin = frag_start
+        self.__end = frag_end
+        self.__frag_size = isize
+        #dimensione buffer + parametri vari
+        self.__seqparams = params
+        self.__p_meth =  {
+            CytosineContext.CG: params['cg'],
+            CytosineContext.CHG: params['chg'],
+            CytosineContext.CHH: params['chh']
+        }
+        #dati sulle citosine
+        self.__cytosines = dict()
+
+        self.__read_quality = dna.read_quality(params.read_length, 10, 40)
+        ##############################
+        self.__set_snp()
+        self.__initialize_cytosines()
+
+
+
+    ###################### Sequencing ######################
+
+    def fragmentation(self):
+        """ """
+        yield dna.fragment(self.__sequence, self.__begin, self.__end).methylate(self.methylate_cytosine)
+
+    def paired_end_sequencing(self):
+        """Produce le read paired-end del frammento e le salva su un file temporaneo"""
+
+        fragment_size = self.__frag_size
+        read_length = self.__seqparams.read_length
+        directional = True
+        seq_length = len(self.__sequence)
+        error_rate = self.__seqparams.error_rate
+
+        reads = list()
+
+        for fragment in self.fragmentation():
+            bsfs = fragment.forward_strand.bisulfite()
+            fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality)\
+                        .set_sequencing_errors(error_rate)\
+                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+
+            bsrs = fragment.reverse_strand.bisulfite()
+            fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality)\
+                        .set_sequencing_errors(error_rate)\
+                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+
+            reads.extend([fastq_fw, fastq_rv])
+
+
+
+            if not directional:
+                fastq_fwrc = bsfs.reverse_complement()\
+                            .paired_end_sequencing(read_length, self.__read_quality)\
+                            .set_sequencing_errors(error_rate)\
+                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+
+                fastq_rvrc = bsrs.reverse_complement()\
+                            .paired_end_sequencing(read_length, self.__read_quality)\
+                            .set_sequencing_errors(error_rate)\
+                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+
+                reads.extend([fastq_fwrc, fastq_rvrc])
+
+        cinfo = self.__format_methylation()
+
+        return reads, cinfo
+
+    ###################### Methylation ######################
+
+    def __initialize_cytosines(self):
+        """Parserizza il genoma e indicizza le citosine sui due strand"""
+
+        limit = len(self.__sequence)
+
+        for pos, base in enumerate(self.__sequence):
+            #strand +
+            if base == 'c':
+                context = CytosineContext.CHH
+                if pos+1 < limit and self.__sequence[pos+1] == 'g':
+                    context = CytosineContext.CG
+                elif pos+2 < limit and self.__sequence[pos+2] == 'g':
+                    context = CytosineContext.CHG
+
+                self.__cytosines[pos] = Cytosine("+", context)
+            #strand -
+            elif base == 'g':
+                context = CytosineContext.CHH
+                if pos-1 >= 0 and self.__sequence[pos-1] == "c":
+                    context = CytosineContext.CG
+                elif pos-2 >= 0 and self.__sequence[pos-2] == "c":
+                    context = CytosineContext.CHG
+
+                self.__cytosines[pos] = Cytosine("-", context)
+
+
+    def methylate_cytosine(self, base, position):
+        state = base.upper()
+        if position in self.__cytosines:
+            cytosine = self.__cytosines[position]
+            cytosine.covered()
+
+            if random.uniform(0, 1) <= self.__p_meth[cytosine.context]:
+                state = state.lower()
+                cytosine.methylate()
+
+        return state
+
+
+    ###################### Introduzione mutazioni ######################
+
+    def __set_snp(self):
+        """Setta SNP random sulla reference"""
+
+        self.__sequence = "".join([random.sample("actg", 1)[0] if random.uniform(0, 1) < self.__seqparams.snp_rate else base\
+                                   for base in self.__sequence])
+
+
+    def __format_methylation(self):
+        """ Returns a list containing all the information about cytosines """
+        beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
+
+        return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,\
+                cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) \
+                    for position, cytosine in self.__cytosines.items()]
