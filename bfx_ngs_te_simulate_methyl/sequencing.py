@@ -821,9 +821,12 @@ class TargetedFragmentSequencer(object):
         """ Returns a list containing all the information about cytosines """
         beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
 
-        data = [(self.__chromoId, abs(position+1), cytosine.strand, str(cytosine.context),
-                 cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) for position, cytosine in self.__cytosines.items()]
+        data = [{'chrom': self.__chromoId,
+                 'pos': abs(position+1),
+                 'strand': cytosine.strand,
+                 'context': str(cytosine.context),
+                 'nmeth': cytosine.nmeth,
+                 'ncov': cytosine.ncov,
+                 'beta_score': beta_score(cytosine)} for position, cytosine in self.__cytosines.items()]
 
-        df = pd.DataFrame(data, columns=['chrom', 'pos', 'strand', 'context', 'nmeth', 'ncov', 'beta_score'])
-
-        return df
+        return data
