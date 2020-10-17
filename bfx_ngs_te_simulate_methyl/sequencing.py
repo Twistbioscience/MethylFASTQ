@@ -36,8 +36,9 @@ import bfx_ngs_te_simulate_methyl.dna as dna
 
 
 def format_time(time):
-    strtime = "{:03.5f} m".format(time/60) if time >= 60 else "{:03.5f} s".format(time)
+    strtime = "{:03.5f} m".format(time / 60) if time >= 60 else "{:03.5f} s".format(time)
     return strtime
+
 
 class CytosineContext(enum.Enum):
     CG = "CG"
@@ -46,6 +47,7 @@ class CytosineContext(enum.Enum):
 
     def __str__(self):
         return self.value
+
 
 class Cytosine(object):
     def __init__(self, strand, context=CytosineContext.CHH):
@@ -175,35 +177,36 @@ class ChromosomeSequencer(object):
 
         tot_time = format_time(timer() - start)
 
-        #sommo dimensioni intervalli
-        self.__stats.increment_bps(sum([e-b for _, b, e in self.__fragments]))
-        print("{} fragments found: {} bp. Elapsed time {}".format(len(self.__fragments), self.__stats.nbases, tot_time), flush=True)
+        # sommo dimensioni intervalli
+        self.__stats.increment_bps(sum([e - b for _, b, e in self.__fragments]))
+        print("{} fragments found: {} bp. Elapsed time {}".format(len(self.__fragments), self.__stats.nbases, tot_time),
+              flush=True)
 
     def load_balancing(self, num_workers):
-        totsize = sum([e-b for _, b, e in self.__fragments])
+        totsize = sum([e - b for _, b, e in self.__fragments])
         average = int(totsize / num_workers)
 
         fragments = list()
-        #sort per visualizzare i frammenti in modo non caotico
-        self.__fragments.sort(key=lambda x: x[2]-x[1], reverse=True)
+        # sort per visualizzare i frammenti in modo non caotico
+        self.__fragments.sort(key=lambda x: x[2] - x[1], reverse=True)
 
         for i, (sequence, begin, end) in enumerate(self.__fragments, 1):
-            size = end-begin
+            size = end - begin
             print("{}. Fragment [{} - {}] of size {} bp".format(i, begin, end, size))
 
-            if size > average: #suddivido il lavoro
+            if size > average:  # suddivido il lavoro
                 num_pieces = math.ceil(size / average)
-                prev, curr = 0, average #offset di inizio e fine
+                prev, curr = 0, average  # offset di inizio e fine
 
                 print(">> {} pieces: ".format(num_pieces), end="")
 
                 for n in range(num_pieces):
-                    subseq = (sequence[prev:curr], begin+prev, begin+curr)
+                    subseq = (sequence[prev:curr], begin + prev, begin + curr)
                     fragments.append(subseq)
 
-                    #print("[{} - {}] ".format(subseq[1], subseq[2]), end="")
+                    # print("[{} - {}] ".format(subseq[1], subseq[2]), end="")
 
-#                    print("\tsubjob {} from {} to {}".format(n+1, begin+prev, begin+curr))
+                    #                    print("\tsubjob {} from {} to {}".format(n+1, begin+prev, begin+curr))
                     prev, curr = curr, curr + average
 
                     if curr > size:
@@ -212,11 +215,10 @@ class ChromosomeSequencer(object):
             else:
                 fragments.append((sequence, begin, end))
 
-        self.__fragments = sorted(fragments, key=lambda x: x[2]-x[1], reverse=True)
+        self.__fragments = sorted(fragments, key=lambda x: x[2] - x[1], reverse=True)
 
-        #for seq, begin, end in self.__fragments:
+        # for seq, begin, end in self.__fragments:
         #    print(begin, end, end-begin, seq)
-
 
     def consumer(self, num_jobs, params, queue):
         """ Thread consumer che legge dalla coda e scrive i dati sull'apposito file"""
@@ -239,7 +241,7 @@ class ChromosomeSequencer(object):
             val = queue.get()
             tval = type(val)
 
-            if tval is int:     #segnale di terminazione di un job
+            if tval is int:  # segnale di terminazione di un job
                 num_jobs -= 1
 
             elif tval is tuple:
@@ -265,7 +267,7 @@ class ChromosomeSequencer(object):
                     else:
                         self.__stats.increment_cytosines(dsize)
         else:
-            #chiudo file
+            # chiudo file
             meth_file.close()
 
             if single_end:
@@ -277,26 +279,26 @@ class ChromosomeSequencer(object):
     def sequencing(self, params):
         self.load_balancing(params.num_processes)
 
-#        self.__fragments = [{"seq": seq, "from": begin, "to": end, "params": params} \
-#                            for seq, begin, end in self.__fragments]
+        #        self.__fragments = [{"seq": seq, "from": begin, "to": end, "params": params} \
+        #                            for seq, begin, end in self.__fragments]
 
-        queue = mp.Queue() #comunicazione tra processi figli e padre
-        num_input = len(self.__fragments)   #numero di input da processare
-        num_process = params.num_processes  #numero massimo di processi da utilizzare
-        single_end = params.seq_mode == "single_end" #variabile di merda, ma vbb
+        queue = mp.Queue()  # comunicazione tra processi figli e padre
+        num_input = len(self.__fragments)  # numero di input da processare
+        num_process = params.num_processes  # numero massimo di processi da utilizzare
+        single_end = params.seq_mode == "single_end"  # variabile di merda, ma vbb
 
         input_data = [{
-                "seq": seq,
-                "offset": (begin, end),
-                "params": params,
-                "queue": queue,
-                "process_id": index,
-                "targeted_mode": self.__targeted_mode
-            }
+            "seq": seq,
+            "offset": (begin, end),
+            "params": params,
+            "queue": queue,
+            "process_id": index,
+            "targeted_mode": self.__targeted_mode
+        }
             for index, (seq, begin, end) in enumerate(self.__fragments)
         ]
 
-        #apro i file di output
+        # apro i file di output
         output_filename = self.__get_output_filename(params)
 
         if single_end:
@@ -308,27 +310,27 @@ class ChromosomeSequencer(object):
         meth_file = open("{}.ch3".format(output_filename), "a")
         csv_meth = csv.writer(meth_file, delimiter="\t")
 
-        #inizializzo i processi con i relativi input:
-        #parametri: (frammento e offset) + coda + indice per il join
-    #    processes = [mp.Process(target=self.create_reads, name="methylPIPPO-{}".format(index), args=(param, params.seq_mode, (index, queue))) \
-    #                    for index, param in enumerate(self.__fragments)]
+        # inizializzo i processi con i relativi input:
+        # parametri: (frammento e offset) + coda + indice per il join
+        #    processes = [mp.Process(target=self.create_reads, name="methylPIPPO-{}".format(index), args=(param, params.seq_mode, (index, queue))) \
+        #                    for index, param in enumerate(self.__fragments)]
         processes = [mp.Process(target=self.create_reads, args=(data,)) for data in input_data]
 
-        curr = 0        #indice del prossimo processo da startare
-        curr_exec = 0   #numero processi attualmente in esecuzione
+        curr = 0  # indice del prossimo processo da startare
+        curr_exec = 0  # numero processi attualmente in esecuzione
 
-        #starto primi processi
+        # starto primi processi
         while curr_exec < min(num_input, num_process):
             processes[curr].start()
             curr += 1
             curr_exec += 1
 
-        #finchè tutti i processi non sono stati eseguiti e non hanno terminato...
+        # finchè tutti i processi non sono stati eseguiti e non hanno terminato...
         while not (curr == num_input and curr_exec == 0):
             val = queue.get()
             tval = type(val)
 
-            if tval is int: #segnale di terminazione di un processo
+            if tval is int:  # segnale di terminazione di un processo
                 processes[val].join()
 
                 if curr < num_input:
@@ -358,7 +360,7 @@ class ChromosomeSequencer(object):
                         csv_meth.writerow(record)
                     else:
                         self.__stats.increment_cytosines(dsize)
-        else: #fine while -> chiudo i file
+        else:  # fine while -> chiudo i file
             meth_file.close()
 
             if single_end:
@@ -367,7 +369,8 @@ class ChromosomeSequencer(object):
                 fastq_file1.close()
                 fastq_file2.close()
 
-        return self.__stats, "{}_S1_L001_R1_001.fastq".format(output_filename), "{}_S1_L001_R2_001.fastq".format(output_filename)
+        return self.__stats, "{}_S1_L001_R1_001.fastq".format(output_filename), "{}_S1_L001_R2_001.fastq".format(
+            output_filename)
 
     def __sequencing(self, params):
         self.load_balancing(params.num_processes)
@@ -376,11 +379,11 @@ class ChromosomeSequencer(object):
 
         ###### TERRRIBBBBILEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE!!!!!
         input_data = [{
-                "seq": seq,
-                "offset": (begin, end),
-                "params": params,
-                "queue": queue
-            }
+            "seq": seq,
+            "offset": (begin, end),
+            "params": params,
+            "queue": queue
+        }
             for seq, begin, end in self.__fragments
         ]
 
@@ -395,8 +398,6 @@ class ChromosomeSequencer(object):
         consumer_thread.join()
 
         return self.__stats
-
-
 
     def __get_output_filename(self, params):
         panelname = os.path.basename(params.regions).rstrip('.bed')
@@ -414,54 +415,55 @@ class ChromosomeSequencer(object):
 
         return "{}/{}".format(params.output_path.rstrip('/'), filename.strip('/'))
 
-
-    def create_reads(self, input_process):#, seq_mode, queue):
+    def create_reads(self, input_process):  # , seq_mode, queue):
         sequence = input_process["seq"]
         offset_begin, offset_end = input_process["offset"]
         queue = input_process["queue"]
         params = input_process["params"]
-        process_id = input_process["process_id"] #new
+        process_id = input_process["process_id"]  # new
         targeted_mode = input_process["targeted_mode"]
 
         pid = os.getpid()
 
-        print("<Process {}>: starting sequencing [{} - {}]: {} bp".format(pid, offset_begin, offset_end, offset_end-offset_begin), flush=True)
+        print("<Process {}>: starting sequencing [{} - {}]: {} bp".format(pid, offset_begin, offset_end,
+                                                                          offset_end - offset_begin), flush=True)
         start = timer()
 
-        fs = FragmentSequencer(self.__chromoId, sequence, offset_begin, offset_end, params, targeted_mode=targeted_mode, queue=queue)
+        fs = FragmentSequencer(self.__chromoId, sequence, offset_begin, offset_end, params, targeted_mode=targeted_mode,
+                               queue=queue)
         fs.single_end_sequencing() if params.seq_mode == "single_end" else fs.paired_end_sequencing()
 
         elapsed = format_time(timer() - start)
 
-        print("<Process {}>: sequencing [{} - {}] terminated in {}".format(pid, offset_begin, offset_end, elapsed), flush=True)
+        print("<Process {}>: sequencing [{} - {}] terminated in {}".format(pid, offset_begin, offset_end, elapsed),
+              flush=True)
 
         queue.put(process_id)
-
 
 
 class FragmentSequencer(object):
     """..."""
 
     def __init__(self, chr_id, sequence, begin_seq, end_seq, seqparams, targeted_mode, queue):
-        #informazioni sulla sequenza
+        # informazioni sulla sequenza
         self.__chromoId = chr_id
         self.__sequence = sequence
-#        self.__genome_size = gsize
+        #        self.__genome_size = gsize
         self.targeted_mode = targeted_mode
-        #posizione del frammento nel genoma
+        # posizione del frammento nel genoma
         self.__offset_forward = begin_seq
         self.__begin = begin_seq
         self.__end = end_seq
-#        self.__offset_reverse = gsize - end_seq
-        #dimensione buffer + parametri vari
+        #        self.__offset_reverse = gsize - end_seq
+        # dimensione buffer + parametri vari
         self.__buffer_size = seqparams.buffer_size
         self.__seqparams = seqparams
-        self.__p_meth =  {
+        self.__p_meth = {
             CytosineContext.CG: seqparams.p_cg,
             CytosineContext.CHG: seqparams.p_chg,
             CytosineContext.CHH: seqparams.p_chh
         }
-        #dati sulle citosine
+        # dati sulle citosine
         self.__cytosines = dict()
         self.__queue = queue
 
@@ -470,44 +472,41 @@ class FragmentSequencer(object):
         self.__set_snp()
         self.__initialize_cytosines()
 
-
-
     ###################### Sequencing ######################
 
     def fragmentation(self):
         """ """
         if not self.targeted_mode:
-            max_step = 2*int(round(self.__seqparams.fragment_size_mean / self.__seqparams.coverage))
+            max_step = 2 * int(round(self.__seqparams.fragment_size_mean / self.__seqparams.coverage))
             i = 0
 
             while (i + self.__seqparams.fragment_size_mean) < len(self.__sequence):
                 fragment = self.__sequence[i: i + self.__seqparams.fragment_size_mean]
 
                 if len(fragment) == self.__seqparams.fragment_size_mean:
-                    yield dna.fragment(fragment, i, i + self.__seqparams.fragment_size_mean)\
-                            .methylate(self.methylate_cytosine)
+                    yield dna.fragment(fragment, i, i + self.__seqparams.fragment_size_mean) \
+                        .methylate(self.methylate_cytosine)
 
-                i += random.randint(1, max_step) #in media ogni base è coperta da C reads
+                i += random.randint(1, max_step)  # in media ogni base è coperta da C reads
         else:
             yield dna.fragment(self.__sequence, self.__begin, self.__end).methylate(self.methylate_cytosine)
-            #for _ in range(0, self.__seqparams.coverage):
-                # isize = 0
-                # while isize <= 1:
-                #     isize = norm.rvs(loc=self.__seqparams.fragment_size_mean, scale=self.__seqparams.fragment_size_sd, size=1)[0]
-                # if isize <= 120:
-                #     delta = 120 - isize
-                #     left_remove = int(round(delta/2))
-                #     new_begin = self.__begin + left_remove
-                # else:
-                #     delta = isize - 120
-                #     left_add = int(round(delta/2))
-                #     new_begin = self.__begin - left_add
-                # new_end = new_begin + isize
-                # fragment = self.__sequence[new_begin:new_end]
-                # print(self.__chromoId, new_begin, new_end, isize)
-              #  fragment = self.__sequence[self.__begin:self.__end]
-              #  yield dna.fragment(fragment, self.__begin, self.__end).methylate(self.methylate_cytosine)
-
+            # for _ in range(0, self.__seqparams.coverage):
+            # isize = 0
+            # while isize <= 1:
+            #     isize = norm.rvs(loc=self.__seqparams.fragment_size_mean, scale=self.__seqparams.fragment_size_sd, size=1)[0]
+            # if isize <= 120:
+            #     delta = 120 - isize
+            #     left_remove = int(round(delta/2))
+            #     new_begin = self.__begin + left_remove
+            # else:
+            #     delta = isize - 120
+            #     left_add = int(round(delta/2))
+            #     new_begin = self.__begin - left_add
+            # new_end = new_begin + isize
+            # fragment = self.__sequence[new_begin:new_end]
+            # print(self.__chromoId, new_begin, new_end, isize)
+            #  fragment = self.__sequence[self.__begin:self.__end]
+            #  yield dna.fragment(fragment, self.__begin, self.__end).methylate(self.methylate_cytosine)
 
     def single_end_sequencing(self):
         """Produce le read single-end del frammento e le salva su un file fastq temporaneo"""
@@ -521,48 +520,46 @@ class FragmentSequencer(object):
         reads = list()
 
         for fragment in self.fragmentation():
-            #metilazione?
+            # metilazione?
             bsfs = fragment.forward_strand.bisulfite()
-            fastq_fw = bsfs.single_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+            fastq_fw = bsfs.single_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
             bsrs = fragment.reverse_strand.bisulfite()
-            fastq_rv = bsrs.single_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+            fastq_rv = bsrs.single_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
             reads.extend([fastq_fw, fastq_rv])
 
             if not directional:
-                fastq_fwrc = bsfs.reverse_complement()\
-                            .single_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                fastq_fwrc = bsfs.reverse_complement() \
+                    .single_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
-                fastq_rvrc = bsrs.reverse_complement()\
-                            .single_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                fastq_rvrc = bsrs.reverse_complement() \
+                    .single_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
                 reads.extend([fastq_fwrc, fastq_rvrc])
 
-
             if len(reads) > self.__buffer_size:
                 self.__queue.put(("fastq_se", reads.copy()))
-    #            self.__persist_record(reads)
+                #            self.__persist_record(reads)
                 reads.clear()
         else:
             if len(reads) > 0:
                 self.__queue.put(("fastq_se", reads.copy()))
-    #            self.__persist_record(reads)
+                #            self.__persist_record(reads)
                 reads.clear()
 
         cinfo = self.__format_methylation()
         self.__queue.put(("ch3", cinfo))
 
-#        self.__persist_methylation()
-
+    #        self.__persist_methylation()
 
     def paired_end_sequencing(self):
         """Produce le read paired-end del frammento e le salva su un file temporaneo"""
@@ -575,47 +572,46 @@ class FragmentSequencer(object):
 
         reads = list()
 
-#        for (fragment, begin, end) in self.__fragmentation():
+        #        for (fragment, begin, end) in self.__fragmentation():
         for fragment in self.fragmentation():
             bsfs = fragment.forward_strand.bisulfite()
-            fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+            fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
             bsrs = fragment.reverse_strand.bisulfite()
-            fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+            fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
             reads.extend([fastq_fw, fastq_rv])
 
-
-
             if not directional:
-                fastq_fwrc = bsfs.reverse_complement()\
-                            .paired_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                fastq_fwrc = bsfs.reverse_complement() \
+                    .paired_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
-                fastq_rvrc = bsrs.reverse_complement()\
-                            .paired_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
+                fastq_rvrc = bsrs.reverse_complement() \
+                    .paired_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, self.__offset_forward)
 
                 reads.extend([fastq_fwrc, fastq_rvrc])
 
             if len(reads) > self.__buffer_size:
                 self.__queue.put(("fastq_pe", reads.copy()))
-        #        self.__persist_record(reads)
+                #        self.__persist_record(reads)
                 reads.clear()
         else:
             if len(reads) > 0:
                 self.__queue.put(("fastq_pe", reads.copy()))
-        #        self.__persist_record(reads)
+                #        self.__persist_record(reads)
                 reads.clear()
 
         cinfo = self.__format_methylation()
         self.__queue.put(("ch3", cinfo))
+
     #    self.__persist_methylation()
 
     ###################### Methylation ######################
@@ -626,25 +622,24 @@ class FragmentSequencer(object):
         limit = len(self.__sequence)
 
         for pos, base in enumerate(self.__sequence):
-            #strand +
+            # strand +
             if base == 'c':
                 context = CytosineContext.CHH
-                if pos+1 < limit and self.__sequence[pos+1] == 'g':
+                if pos + 1 < limit and self.__sequence[pos + 1] == 'g':
                     context = CytosineContext.CG
-                elif pos+2 < limit and self.__sequence[pos+2] == 'g':
+                elif pos + 2 < limit and self.__sequence[pos + 2] == 'g':
                     context = CytosineContext.CHG
 
                 self.__cytosines[pos] = Cytosine("+", context)
-            #strand -
+            # strand -
             elif base == 'g':
                 context = CytosineContext.CHH
-                if pos-1 >= 0 and self.__sequence[pos-1] == "c":
+                if pos - 1 >= 0 and self.__sequence[pos - 1] == "c":
                     context = CytosineContext.CG
-                elif pos-2 >= 0 and self.__sequence[pos-2] == "c":
+                elif pos - 2 >= 0 and self.__sequence[pos - 2] == "c":
                     context = CytosineContext.CHG
 
                 self.__cytosines[pos] = Cytosine("-", context)
-
 
     def methylate_cytosine(self, base, position):
         state = base.upper()
@@ -658,23 +653,22 @@ class FragmentSequencer(object):
 
         return state
 
-
     ###################### Introduzione mutazioni ######################
 
     def __set_snp(self):
         """Setta SNP random sulla reference"""
 
-        self.__sequence = "".join([random.sample("actg", 1)[0] if random.uniform(0, 1) < self.__seqparams.snp_rate else base\
-                                   for base in self.__sequence])
-
+        self.__sequence = "".join(
+            [random.sample("actg", 1)[0] if random.uniform(0, 1) < self.__seqparams.snp_rate else base \
+             for base in self.__sequence])
 
     def __format_methylation(self):
         """ Returns a list containing all the information about cytosines """
         beta_score = lambda c: 0 if c.ncov == 0 else c.nmeth / c.ncov
 
-        return [(self.__chromoId, abs(self.__offset_forward+position), cytosine.strand, cytosine.context,\
-                cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) \
-                    for position, cytosine in self.__cytosines.items()]
+        return [(self.__chromoId, abs(self.__offset_forward + position), cytosine.strand, cytosine.context, \
+                 cytosine.nmeth, cytosine.ncov, beta_score(cytosine)) \
+                for position, cytosine in self.__cytosines.items()]
 
 
 class objectview(object):
@@ -687,29 +681,28 @@ class TargetedFragmentSequencer(object):
 
     def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=10, maxq=40):
         params = objectview(params)
-        #informazioni sulla sequenza
+        # informazioni sulla sequenza
         self.__chromoId = chrom
         self.__sequence = sequence
-        #posizione del frammento nel genoma
+        # posizione del frammento nel genoma
         self.__offset_forward = frag_start
         self.__begin = frag_start
         self.__end = frag_end
         self.__frag_size = isize
-        #dimensione buffer + parametri vari
+        # dimensione buffer + parametri vari
         self.__seqparams = params
-        self.__p_meth =  {
+        self.__p_meth = {
             CytosineContext.CG: params.cg,
             CytosineContext.CHG: params.chg,
             CytosineContext.CHH: params.chh
         }
-        #dati sulle citosine
+        # dati sulle citosine
         self.__cytosines = dict()
 
         self.__read_quality = dna.read_quality(params.read_length, minq, maxq)
         ##############################
         self.__set_snp()
         self.__initialize_cytosines(frag_start)
-
 
     ###################### Sequencing ######################
 
@@ -730,29 +723,27 @@ class TargetedFragmentSequencer(object):
 
         for fragment in self.fragmentation():
             bsfs = fragment.forward_strand.bisulfite()
-            fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, 0)
+            fastq_fw = bsfs.paired_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, 0)
 
             bsrs = fragment.reverse_strand.bisulfite()
-            fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality)\
-                        .set_sequencing_errors(error_rate)\
-                        .fastqize(self.__chromoId, fragment_size, 0)
+            fastq_rv = bsrs.paired_end_sequencing(read_length, self.__read_quality) \
+                .set_sequencing_errors(error_rate) \
+                .fastqize(self.__chromoId, fragment_size, 0)
 
             reads.extend([fastq_fw, fastq_rv])
 
-
-
             if not directional:
-                fastq_fwrc = bsfs.reverse_complement()\
-                            .paired_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, 0)
+                fastq_fwrc = bsfs.reverse_complement() \
+                    .paired_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, 0)
 
-                fastq_rvrc = bsrs.reverse_complement()\
-                            .paired_end_sequencing(read_length, self.__read_quality)\
-                            .set_sequencing_errors(error_rate)\
-                            .fastqize(self.__chromoId, fragment_size, 0)
+                fastq_rvrc = bsrs.reverse_complement() \
+                    .paired_end_sequencing(read_length, self.__read_quality) \
+                    .set_sequencing_errors(error_rate) \
+                    .fastqize(self.__chromoId, fragment_size, 0)
 
                 reads.extend([fastq_fwrc, fastq_rvrc])
 
@@ -775,25 +766,24 @@ class TargetedFragmentSequencer(object):
         limit = len(self.__sequence)
 
         for pos, base in enumerate(self.__sequence):
-            #strand +
+            # strand +
             if base == 'c':
                 context = CytosineContext.CHH
-                if pos+1 < limit and self.__sequence[pos+1] == 'g':
+                if pos + 1 < limit and self.__sequence[pos + 1] == 'g':
                     context = CytosineContext.CG
-                elif pos+2 < limit and self.__sequence[pos+2] == 'g':
+                elif pos + 2 < limit and self.__sequence[pos + 2] == 'g':
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos+begin] = Cytosine("+", context)
-            #strand -
+                self.__cytosines[pos + begin] = Cytosine("+", context)
+            # strand -
             elif base == 'g':
                 context = CytosineContext.CHH
-                if pos-1 >= 0 and self.__sequence[pos-1] == "c":
+                if pos - 1 >= 0 and self.__sequence[pos - 1] == "c":
                     context = CytosineContext.CG
-                elif pos-2 >= 0 and self.__sequence[pos-2] == "c":
+                elif pos - 2 >= 0 and self.__sequence[pos - 2] == "c":
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos+begin] = Cytosine("-", context)
-
+                self.__cytosines[pos + begin] = Cytosine("-", context)
 
     def methylate_cytosine(self, base, position):
         state = base.upper()
@@ -807,15 +797,14 @@ class TargetedFragmentSequencer(object):
 
         return state
 
-
     ###################### Introduzione mutazioni ######################
 
     def __set_snp(self):
         """Setta SNP random sulla reference"""
-
-        self.__sequence = "".join([random.sample("actg", 1)[0] if random.uniform(0, 1) < self.__seqparams.snp_rate else base\
-                                   for base in self.__sequence])
-
+        if self.__seqparams.snp_rate > 0.0:
+            self.__sequence = "".join(
+                [random.sample("actg", 1)[0] if random.uniform(0, 1) < self.__seqparams.snp_rate else base \
+                 for base in self.__sequence])
 
     def __format_methylation(self):
         """ Returns a list containing all the information about cytosines """
@@ -830,7 +819,7 @@ class TargetedFragmentSequencer(object):
         #          'beta_score': beta_score(cytosine)} for position, cytosine in self.__cytosines.items()]
 
         data = [(self.__chromoId,
-                 abs(position+1),
+                 abs(position + 1),
                  cytosine.strand,
                  str(cytosine.context),
                  cytosine.nmeth,
