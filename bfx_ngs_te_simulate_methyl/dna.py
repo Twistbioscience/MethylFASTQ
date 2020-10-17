@@ -194,10 +194,11 @@ class read(object):
 
     def set_sequencing_errors(self, error_rate):
         """ """
-        for index in range(len(self.sequence)):
-            if random.uniform(0, 1) < error_rate:
-                self.__sequence[index] = random.sample("actg", 1)[0]
-                self.quality[index] -= int(random.random() * 1000) % 10
+        if error_rate > 0.0:
+            for index in range(len(self.sequence)):
+                if random.uniform(0, 1) < error_rate:
+                    self.__sequence[index] = random.sample("actg", 1)[0]
+                    self.quality[index] -= int(random.random() * 1000) % 10
         return self
 
     def fastqize(self, read_id, fsize, offset, uid, paired_end=None):
