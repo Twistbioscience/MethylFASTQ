@@ -800,7 +800,7 @@ class TargetedFragmentSequencer(object):
             cytosine = self.__cytosines[position]
             cytosine.covered()
 
-            if cytosine.is_methylated is not None and cytosine.is_methylated:
+            if cytosine.is_methylated is not None and cytosine.is_methylated is True:
                 state = state.lower()
                 cytosine.methylate()
             elif self.__p_meth[cytosine.context] == 1.0:
