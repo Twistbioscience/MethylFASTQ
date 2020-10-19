@@ -679,7 +679,8 @@ class objectview(object):
 class TargetedFragmentSequencer(object):
     """..."""
 
-    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=10, maxq=40):
+    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=20, maxq=50,
+                 cytosines=None):
         params = objectview(params)
         # informazioni sulla sequenza
         self.__chromoId = chrom
@@ -696,13 +697,16 @@ class TargetedFragmentSequencer(object):
             CytosineContext.CHG: params.chg,
             CytosineContext.CHH: params.chh
         }
-        # dati sulle citosine
-        self.__cytosines = dict()
 
         self.__read_quality = dna.read_quality(params.read_length, minq, maxq)
         ##############################
         self.__set_snp()
-        self.__initialize_cytosines(frag_start)
+
+        if cytosines is None:
+            self.__cytosines = dict()
+            self.__initialize_cytosines(frag_start)
+        else:
+            self.__cytosines = cytosines
 
     ###################### Sequencing ######################
 
@@ -791,7 +795,12 @@ class TargetedFragmentSequencer(object):
             cytosine = self.__cytosines[position]
             cytosine.covered()
 
-            if random.uniform(0, 1) <= self.__p_meth[cytosine.context]:
+            if self.__p_meth[cytosine.context] == 1.0:
+                state = state.lower()
+                cytosine.methylate()
+            elif self.__p_meth[cytosine.context] == 0.0:
+                return state
+            elif random.uniform(0, 1) <= self.__p_meth[cytosine.context]:
                 state = state.lower()
                 cytosine.methylate()
 
