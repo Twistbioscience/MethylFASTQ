@@ -50,11 +50,12 @@ class CytosineContext(enum.Enum):
 
 
 class Cytosine(object):
-    def __init__(self, strand, context=CytosineContext.CHH):
+    def __init__(self, strand, context=CytosineContext.CHH, is_methylated=None):
         self.__context = context
         self.__strand = strand
         self.__nmeth = 0
         self.__ncov = 0
+        self.__is_methylated = is_methylated
 
     @property
     def context(self):
@@ -71,6 +72,10 @@ class Cytosine(object):
     @property
     def ncov(self):
         return self.__ncov
+
+    @property
+    def is_methylated(self):
+        return self.__is_methylated
 
     def methylate(self):
         self.__nmeth += 1
@@ -795,7 +800,10 @@ class TargetedFragmentSequencer(object):
             cytosine = self.__cytosines[position]
             cytosine.covered()
 
-            if self.__p_meth[cytosine.context] == 1.0:
+            if cytosine.is_methylated is not None and cytosine.is_methylated:
+                state = state.lower()
+                cytosine.methylate()
+            elif self.__p_meth[cytosine.context] == 1.0:
                 state = state.lower()
                 cytosine.methylate()
             elif self.__p_meth[cytosine.context] == 0.0:
