@@ -685,7 +685,7 @@ class TargetedFragmentSequencer(object):
     """..."""
 
     def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=20, maxq=50,
-                 cytosines=None):
+                 meth_sites=None):
         params = objectview(params)
         # informazioni sulla sequenza
         self.__chromoId = chrom
@@ -707,11 +707,9 @@ class TargetedFragmentSequencer(object):
         ##############################
         self.__set_snp()
 
-        if cytosines is None:
-            self.__cytosines = dict()
-            self.__initialize_cytosines(frag_start)
-        else:
-            self.__cytosines = cytosines
+        self.__cytosines = dict()
+        self.__initialize_cytosines(frag_start, meth_sites)
+
 
     ###################### Sequencing ######################
 
@@ -769,7 +767,7 @@ class TargetedFragmentSequencer(object):
 
     ###################### Methylation ######################
 
-    def __initialize_cytosines(self, begin):
+    def __initialize_cytosines(self, begin, meth_sites=None):
         """Parserizza il genoma e indicizza le citosine sui due strand"""
 
         limit = len(self.__sequence)
@@ -783,7 +781,12 @@ class TargetedFragmentSequencer(object):
                 elif pos + 2 < limit and self.__sequence[pos + 2] == 'g':
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos + begin] = Cytosine("+", context)
+                if meth_sites is None:
+                    self.__cytosines[pos + begin] = Cytosine("+", context, None)
+                elif (pos + begin) in meth_sites:
+                    self.__cytosines[pos + begin] = Cytosine("+", context, True)
+                else:
+                    self.__cytosines[pos + begin] = Cytosine("+", context, False)
             # strand -
             elif base == 'g':
                 context = CytosineContext.CHH
@@ -792,7 +795,12 @@ class TargetedFragmentSequencer(object):
                 elif pos - 2 >= 0 and self.__sequence[pos - 2] == "c":
                     context = CytosineContext.CHG
 
-                self.__cytosines[pos + begin] = Cytosine("-", context)
+                if meth_sites is None:
+                    self.__cytosines[pos + begin] = Cytosine("-", context, None)
+                elif (pos + begin) in meth_sites:
+                    self.__cytosines[pos + begin] = Cytosine("-", context, True)
+                else:
+                    self.__cytosines[pos + begin] = Cytosine("-", context, False)
 
     def methylate_cytosine(self, base, position):
         state = base.upper()
@@ -803,14 +811,17 @@ class TargetedFragmentSequencer(object):
             if cytosine.is_methylated is not None and cytosine.is_methylated is True:
                 state = state.lower()
                 cytosine.methylate()
+                return state
             elif self.__p_meth[cytosine.context] == 1.0:
                 state = state.lower()
                 cytosine.methylate()
+                return state
             elif self.__p_meth[cytosine.context] == 0.0:
                 return state
             elif random.uniform(0, 1) <= self.__p_meth[cytosine.context]:
                 state = state.lower()
                 cytosine.methylate()
+                return state
 
         return state
 
