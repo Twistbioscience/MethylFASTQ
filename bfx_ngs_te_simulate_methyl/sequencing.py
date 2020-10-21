@@ -684,7 +684,7 @@ class objectview(object):
 class TargetedFragmentSequencer(object):
     """..."""
 
-    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=20, maxq=50,
+    def __init__(self, chrom, orig_start, orig_end, frag_start, frag_end, isize, sequence, params, minq=30, maxq=50,
                  meth_sites=None):
         params = objectview(params)
         # informazioni sulla sequenza
@@ -781,12 +781,14 @@ class TargetedFragmentSequencer(object):
                 elif pos + 2 < limit and self.__sequence[pos + 2] == 'g':
                     context = CytosineContext.CHG
 
-                if meth_sites is None:
-                    self.__cytosines[pos + begin] = Cytosine("+", context, None)
-                elif (pos + begin) in meth_sites:
-                    self.__cytosines[pos + begin] = Cytosine("+", context, True)
-                else:
-                    self.__cytosines[pos + begin] = Cytosine("+", context, False)
+                if pos in range(0, self.__seqparams.read_length) or \
+                   pos in range(len(self.__sequence) - self.__seqparams.read_length - 1, len(self.__sequence)):
+                    if meth_sites is None:
+                        self.__cytosines[pos + begin] = Cytosine("+", context, None)
+                    elif (pos + begin) in meth_sites:
+                        self.__cytosines[pos + begin] = Cytosine("+", context, True)
+                    else:
+                        self.__cytosines[pos + begin] = Cytosine("+", context, False)
             # strand -
             elif base == 'g':
                 context = CytosineContext.CHH
@@ -795,16 +797,18 @@ class TargetedFragmentSequencer(object):
                 elif pos - 2 >= 0 and self.__sequence[pos - 2] == "c":
                     context = CytosineContext.CHG
 
-                if meth_sites is None:
-                    self.__cytosines[pos + begin] = Cytosine("-", context, None)
-                elif (pos + begin) in meth_sites:
-                    self.__cytosines[pos + begin] = Cytosine("-", context, True)
-                else:
-                    self.__cytosines[pos + begin] = Cytosine("-", context, False)
+                if pos in range(0, self.__seqparams.read_length) or \
+                        pos in range(len(self.__sequence) - self.__seqparams.read_length - 1, len(self.__sequence)):
+                    if meth_sites is None:
+                        self.__cytosines[pos + begin] = Cytosine("-", context, None)
+                    elif (pos + begin) in meth_sites:
+                        self.__cytosines[pos + begin] = Cytosine("-", context, True)
+                    else:
+                        self.__cytosines[pos + begin] = Cytosine("-", context, False)
 
     def methylate_cytosine(self, base, position):
         state = base.upper()
-        if position in self.__cytosines:
+        if position in self.__cytosines and :
             cytosine = self.__cytosines[position]
             cytosine.covered()
 
