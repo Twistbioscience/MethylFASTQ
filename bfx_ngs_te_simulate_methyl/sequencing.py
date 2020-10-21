@@ -808,7 +808,7 @@ class TargetedFragmentSequencer(object):
 
     def methylate_cytosine(self, base, position):
         state = base.upper()
-        if position in self.__cytosines and :
+        if position in self.__cytosines:
             cytosine = self.__cytosines[position]
             cytosine.covered()
 
